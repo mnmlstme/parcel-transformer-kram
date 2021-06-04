@@ -1,0 +1,27 @@
+{
+  "name": "parcel-transformer-kram",
+  "version": "1.0.0",
+  "engines": {
+    "parcel": "2.0.0-beta.2"
+  },
+  "description": "kram is a toolchain that flips markdown to focus on the code",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "markdown",
+    "documentation",
+    "notebook",
+    "creative",
+    "coding"
+  ],
+  "author": "ken@mnmlst.me",
+  "license": "BSD-3-Clause",
+  "dependencies": {
+    "@parcel/plugin": "^2.0.0-alpha.3",
+    "front-matter": "^4.0.2",
+    "marked": "^2.0.3",
+    "parcel-bundler": "^1.12.5"
+  }
+}
