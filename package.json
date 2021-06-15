@@ -20,8 +20,6 @@
   "license": "BSD-3-Clause",
   "dependencies": {
     "@parcel/plugin": "^2.0.0-alpha.3",
-    "front-matter": "^4.0.2",
-    "marked": "^2.0.3",
-    "parcel-bundler": "^1.12.5"
+    "kram": "file:../kram"
   }
 }

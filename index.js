@@ -1,7 +1,6 @@
-const { Transformer } = require('@parcel/plugin')
 const path = require('path')
-const marked = require('marked')
-const frontMatter = require('front-matter')
+const { Transformer } = require('@parcel/plugin')
+const Kr = require('kram')
 
 module.exports = new Transformer ({
 
@@ -14,24 +13,8 @@ module.exports = new Transformer ({
       language: meta.lang
     })
 
-    const code = asset.getCode()
-    const { body, attributes } = frontMatter(await code)
-    const { platform } = attributes
-    const defaultLang = platform.replace(/-.*$/, '')
-
-    const doc = marked.lexer(body).map( function (token, index) {
-      if ( token.type === "code" ) {
-        const assign = {
-          id: `krumb-${index}`,
-          lang: token.lang || defaultLang
-        }
-        return Object.assign(token, assign)
-      } else {
-        return token
-      }
-    })
-
-    return { front: attributes, doc }
+    const code = await asset.getCode()
+    return Kr.parse( code )
   },
 
   async transform({ asset, config, logger, resolve, options }) {
@@ -43,43 +26,39 @@ module.exports = new Transformer ({
     const { front, doc } = await asset.getAST()
     const { platform, model } = front
 
-    const code = doc.filter( t => t.type === "code")
-
      logger.info({
-       message: `Kram: transforming ${filePath} query=${JSON.stringify(query)} meta=${JSON.stringify(meta)}`,
+       message: `Kram: ${id}\nfrom ${filePath} query=${JSON.stringify(query)} meta=${JSON.stringify(meta)}`,
        filePath,
        language: meta.lang
      })
 
     if ( query && query.kram && query.lang ) {
-      // Generate code asset
-
-      // TODO: plugins for other platforms
       const lang = query.lang
-      const generator = require(`./src/generators/${platform}.js`)
-      const generated = generator(pkg, front, code, lang)
-      const codeFile = path.resolve(
-        kramDir,
-        `./kram-${platform}/${pkg}.${lang}`
-      )
+      const generated = Kr.collate(pkg, front, doc, lang)
 
       asset.type = lang
       asset.setCode(generated)
-      asset.uniqueKey = `${platform}-${lang}`
+      //asset.uniqueKey = `${platform}-${lang}`
 
+      logger.info({
+        message: `Kram: generated asset:\n${generated}`,
+        filePath,
+        language: lang
+      })
     } else {
       // Generate doc asset with dependences
-
-      const dependences = code.map( t => t.lang )
-        .reduce(
-          (accum, next) => accum.includes(next) ?
-            accum : accum.concat([next]),
-          []
-         )
+      const dependences = Kr.getLanguages( doc )
         .map( lang => {
+            logger.info({
+                message: `Kram: generated dependence:\n${JSON.stringify(lang)}`,
+                filePath,
+                language: lang
+            })
+
           const dependency = {
              moduleSpecifier:
-                `./${pkg}.${lang}?kram=${kramFile}&lang=${lang}`,
+                //`kram:./${pkg}.${platform}.${lang}?kram=${kramFile}&lang=${lang}`,
+                `${filePath}?kram=${kramFile}&platform=${platform}&lang=${lang}`,
              resolveFrom: filePath,
              meta: { platform, lang },
              loc: {
@@ -96,19 +75,23 @@ module.exports = new Transformer ({
       const json = JSON.stringify({
         platform,
         model,
-        doc,
-        html: marked.parser(doc),
+        html: Kr.html(doc),
         modules: Object.fromEntries(
-          dependences.map( d => [d.meta.lang, d.moduleSpecifier]))
-      }).replace(/}$/,
-        `,"mount": function(node, initial){
-          let mountfn = require('${dependences[0].moduleSpecifier}');
-          mountfn(node, initial)
-         }}`
-      )
+            dependences.map(
+                d => [d.meta.lang, d.moduleSpecifier]
+            ))
+      })
+
+      const bindFn = Kr.bind(dependences[0].moduleSpecifier, platform)
 
       asset.type = 'js'
-      asset.setCode(`module.exports = ${json}`)
+      asset.setCode(`
+          const Kram = require('kram')
+          module.exports = Object.assign(${json}, {
+            bind: ${bindFn}
+          })
+              `
+      )
     }
 
     return [ asset ]
