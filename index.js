@@ -8,13 +8,13 @@ module.exports = new Transformer ({
     const { filePath, meta } = asset
 
     logger.info({
-      message: `Kram: extracting code from ${filePath}`,
+      message: `Kram: parsing kram file ${filePath}`,
       filePath,
       language: meta.lang
     })
 
-    const code = await asset.getCode()
-    return Kr.parse( code )
+    const content = await asset.getCode()
+    return Kr.parse( content )
   },
 
   async transform({ asset, config, logger, resolve, options }) {
@@ -23,31 +23,18 @@ module.exports = new Transformer ({
     const kramDir = path.dirname(filePath)
     const kramFile = path.basename(filePath)
     const pkg = path.basename(filePath, '.kr')
-    const { front, doc } = await asset.getAST()
-    const { platform, model } = front
 
-     logger.info({
-       message: `Kram: ${id}\nfrom ${filePath} query=${JSON.stringify(query)} meta=${JSON.stringify(meta)}`,
+    logger.info({
+       message: `Kram: transforming ${filePath}`,
        filePath,
        language: meta.lang
      })
 
-    if ( query && query.kram && query.lang ) {
-      const lang = query.lang
-      const generated = Kr.collate(pkg, front, doc, lang)
+    const { front, doc } = await asset.getAST()
+    const { platform, model } = front
+    const konfig = Kr.config(front, pkg)
 
-      asset.type = lang
-      asset.setCode(generated)
-      //asset.uniqueKey = `${platform}-${lang}`
-
-      logger.info({
-        message: `Kram: generated asset:\n${generated}`,
-        filePath,
-        language: lang
-      })
-    } else {
-      // Generate doc asset with dependences
-      const dependences = Kr.getLanguages( doc )
+    const dependences = Kr.getLanguages( doc )
         .map( lang => {
             logger.info({
                 message: `Kram: generated dependence:\n${JSON.stringify(lang)}`,
@@ -58,7 +45,7 @@ module.exports = new Transformer ({
           const dependency = {
              moduleSpecifier:
                 //`kram:./${pkg}.${platform}.${lang}?kram=${kramFile}&lang=${lang}`,
-                `${filePath}?kram=${kramFile}&platform=${platform}&lang=${lang}`,
+                `./${platform}/${pkg}.${lang}`,
              resolveFrom: filePath,
              meta: { platform, lang },
              loc: {
@@ -82,7 +69,7 @@ module.exports = new Transformer ({
             ))
       })
 
-      const bindFn = Kr.bind(dependences[0].moduleSpecifier, platform)
+      const bindFn = konfig.bind(dependences[0].moduleSpecifier)
 
       asset.type = 'js'
       asset.setCode(`
@@ -92,7 +79,6 @@ module.exports = new Transformer ({
           })
               `
       )
-    }
 
     return [ asset ]
   },
