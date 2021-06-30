@@ -22,7 +22,7 @@ module.exports = new Transformer ({
     const { id, filePath, meta, type, query } = asset
     const kramDir = path.dirname(filePath)
     const kramFile = path.basename(filePath)
-    const pkg = path.basename(filePath, '.kr')
+    const base = path.basename(filePath, '.kr')
 
     logger.info({
        message: `Kram: transforming ${filePath}`,
@@ -32,27 +32,28 @@ module.exports = new Transformer ({
 
     const { front, doc } = await asset.getAST()
     const { platform, model } = front
+    const hashkey = Kr.hashcode({front, doc})
+    const pkg = `Kram_${hashkey}_${base}`
     const konfig = Kr.config(front, pkg)
 
     const dependences = Kr.getLanguages( doc )
         .map( lang => {
             logger.info({
-                message: `Kram: generated dependence:\n${JSON.stringify(lang)}`,
+                message: `Kram: dependency ${pkg}.${lang}`,
                 filePath,
                 language: lang
             })
 
-          const dependency = {
-             moduleSpecifier:
-                //`kram:./${pkg}.${platform}.${lang}?kram=${kramFile}&lang=${lang}`,
-                `./${platform}/${pkg}.${lang}`,
-             resolveFrom: filePath,
-             meta: { platform, lang },
-             loc: {
-                filePath,
-                start: { line: 1, column: 1 },
-                end: { line: 1, column: 1 }
-              }
+            const dependency = {
+                moduleSpecifier:
+                    `${filePath}#${pkg}.${lang}`,
+                resolveFrom: filePath,
+                meta: { platform, lang },
+                loc: {
+                    filePath,
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: 1 }
+                }
             }
 
            asset.addDependency(dependency)
